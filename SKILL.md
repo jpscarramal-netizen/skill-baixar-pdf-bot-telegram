@@ -1,88 +1,96 @@
 ---
 name: baixar-pdf-bot-telegram
-description: Baixa PDFs de artigos pelo bot do Telegram @nielsbohr_bot, mandando um DOI por vez pela conta do JP (Telethon) e clicando no botao "PDF" quando ele aparece. Use quando faltarem PDFs depois de tentar editora/Chrome/Scholar, ou quando o JP disser "manda o DOI pro bot", "tenta pelo nielsbohr", "baixa pelo telegram".
+description: Baixa PDFs de artigos pelo bot do Telegram @nielsbohr_bot, mandando um DOI por vez pela conta Telegram do proprio usuario (Telethon) e clicando no botao "PDF" quando ele aparece. Use quando faltarem PDFs depois de tentar editora e Google Scholar, ou quando pedirem "manda o DOI pro bot", "tenta pelo nielsbohr", "baixa pelo telegram".
 ---
 
-# Baixar PDF pelo @nielsbohr_bot (Telegram)
+# Baixar PDF de artigo pelo bot do Telegram @nielsbohr_bot
 
-O bot recebe um **DOI** e responde com uma mensagem de botoes. Se tiver o artigo, o primeiro botao e
-**"⬇️ PDF | tamanho"**; clicando nele, o bot manda o arquivo. Se nao tiver, o primeiro botao e
-**"📦 Request (10 - n)"** (pedido ao bot, parece gastar uma cota; **nao clicar sem o JP autorizar**).
+Manda um **DOI** para o bot e baixa o PDF automaticamente. Funciona com a **sua própria conta do
+Telegram**: cada pessoa cria a sua sessão (passo 2). Não precisa de token de bot nem de nada de
+terceiros.
 
-Nao existe token de bot aqui: a automacao usa a **conta do Telegram do JP** (Telethon), igual ao
-pipeline `telegram-aulas`.
+Como o bot responde:
 
-## Quando usar (ordem de tentativa)
-
-1. Rota da editora pelo Chrome/Edge (clique real em "View PDF", ver skill `baixar-artigos-scholar`).
-2. Botao [PDF] do Google Scholar.
-3. **Este bot**, pelo DOI. Resolveu 7 de 15 pendentes que as outras rotas nao pegaram
-   (Neurosurgery, J Neurosurg e AJNR vieram por aqui).
+- Tem o artigo → botão **"⬇️ PDF | tamanho"** → o script clica e salva o arquivo.
+- Não tem → botão **"📦 Request (10 - n)"**. É um pedido ao bot, parece gastar uma cota sua, então
+  o script **nunca** clica nele.
 
 ## Passo a passo
 
-### 1. Preparar (uma vez so)
-
-- `pip install telethon pypdf cryptg`
-- Credenciais da API do Telegram: https://my.telegram.org > *API development tools* > criar app.
-  Anote `api_id` e `api_hash`.
-- Uma sessao do Telethon ja logada na conta do JP (arquivo `.session`). No projeto do JP ja existe
-  `C:\Users\joaop\Claude contexto\telegram-aulas\sessao_aulas.session`. Se nao existir, logar uma vez
-  com `TelegramClient("minha_sessao", api_id, api_hash)` e digitar o codigo que chega no Telegram.
-- Definir as variaveis de ambiente (PowerShell):
+### 1. Instalar
 
 ```powershell
-$env:TG_API_ID   = "<api_id>"
-$env:TG_API_HASH = "<api_hash>"
-$env:TG_SESSION  = "C:\caminho\da\sessao"     # SEM a extensao .session
-$env:PYTHONIOENCODING = "utf-8"               # as respostas do bot trazem emoji
+pip install telethon pypdf cryptg
 ```
 
-**Nunca** colocar `api_hash` nem o `.session` no GitHub: a sessao da acesso total a conta.
+(`cryptg` só acelera; `pypdf` serve para conferir o PDF baixado.)
 
-### 2. Testar com UM DOI
+### 2. Criar a SUA sessão do Telegram (uma vez)
+
+1. Entre em https://my.telegram.org com o seu telefone, abra **API development tools** e crie um
+   app (nome e short name podem ser qualquer coisa). Anote o `api_id` e o `api_hash`.
+2. No PowerShell:
 
 ```powershell
-python baixar_por_doi.py --saida D:\pdfs 10.1227/neu.0000000000004150
+$env:TG_API_ID   = "<seu api_id>"
+$env:TG_API_HASH = "<seu api_hash>"
+python criar_sessao.py minha_sessao
 ```
 
-Saida esperada: `PDF salvo (741304 B); 11 paginas, DOI confere`. Se vier
-`sem PDF no bot (botao: 📦 Request (10 - 1))`, o bot nao tem o artigo.
+3. Digite o telefone (com `+55...`), o código que chega no app do Telegram e a senha de duas
+   etapas, se tiver. Vai aparecer `minha_sessao.session` na pasta.
+4. Abra o Telegram uma vez e mande `/start` para `@nielsbohr_bot`, para o chat existir.
 
-### 3. Rodar a lista, um DOI por vez
+> **Segurança:** o `.session` dá acesso total à sua conta. Não compartilhe e não suba no GitHub
+> (o `.gitignore` já bloqueia). O `api_hash` também é seu e não deve ser compartilhado.
+
+### 3. Testar com UM DOI
 
 ```powershell
-python baixar_por_doi.py --saida D:\pdfs --arquivo dois.txt
+$env:TG_API_ID   = "<seu api_id>"
+$env:TG_API_HASH = "<seu api_hash>"
+$env:TG_SESSION  = "C:\caminho\minha_sessao"     # sem a extensão .session
+$env:PYTHONIOENCODING = "utf-8"                  # as respostas do bot trazem emoji
+python baixar_por_doi.py --saida .\pdfs 10.1227/neu.0000000000004150
 ```
 
-`dois.txt` = um DOI por linha. O script espera ate 30 s a resposta, clica no botao PDF, espera o
-arquivo, valida e passa ao proximo com 4 s de pausa. O resumo fica em `D:\pdfs\resultado_bot.json`.
+Saída esperada: `PDF salvo (741304 B); 11 paginas, DOI confere`. Se vier
+`sem PDF no bot (botao: 📦 Request ...)`, o bot não tem esse artigo.
 
-### 4. Validar antes de aceitar (obrigatorio)
+### 4. Rodar a lista, um DOI por vez
 
-O script ja confere, mas **conferir de novo** quando for entregar:
+Crie `dois.txt` com um DOI por linha e rode:
 
-- O **DOI impresso na 1a ou 2a pagina** bate com o do registro.
-- **Mais de 100 paginas = livro de resumos**, descartar mesmo que o DOI bata.
-- Titulo tambem confere (se o titulo nao bater mas o DOI bater, olhar a primeira pagina a mao).
+```powershell
+python baixar_por_doi.py --saida .\pdfs --arquivo dois.txt
+```
 
-### 5. Registrar
+O script espera até 30 s pela resposta, clica no botão PDF, espera o arquivo, valida e passa ao
+próximo com 4 s de pausa. O resumo fica em `pdfs\resultado_bot.json`.
 
-Renomear para o padrao do projeto e atualizar o manifesto (status baixado/pendente por artigo).
-Os que o bot nao tem vao para a lista de pendentes manuais.
+### 5. Conferir antes de usar
 
-## Armadilhas conhecidas
+- O **DOI impresso na 1ª ou 2ª página** bate com o que você pediu.
+- **Mais de 100 páginas = livro de resumos**: descarte, mesmo que o DOI bata.
+- Se o título não bater mas o DOI bater, olhe a primeira página à mão.
 
-- **Um DOI por vez.** Varios ao mesmo tempo misturam as respostas. O script ja espera cada um.
-- **Copiar a sessao** antes de usar (o script faz sozinho): o SQLite da sessao trava se outro script
-  estiver aberto com ela. O pipeline `telegram-aulas` usa `receive_updates=False` pelo mesmo motivo.
-- **Erro de encoding no terminal** (`charmap ... can't encode '\U0001f4e6'`): faltou
-  `PYTHONIOENCODING=utf-8`.
-- **Queda de rede no meio** (`WinError 1236/1231`): o Telethon reconecta sozinho; conferir no fim
-  o que realmente chegou em disco.
-- **"Request" nao e download.** Nao clicar sem o JP dizer que pode gastar a cota.
-- Resumo de congresso (suplemento) quase nunca tem PDF completo: nao insistir.
+## Problemas comuns
 
-## Arquivos
+| Sintoma | Causa e solução |
+|---|---|
+| `charmap ... can't encode '\U0001f4e6'` | Faltou `PYTHONIOENCODING=utf-8`. |
+| `database is locked` | Outro script está com a sessão aberta. O script já trabalha numa cópia; feche o outro. |
+| `WinError 1236/1231` no meio | Queda de rede. O Telethon reconecta sozinho; confira no fim o que chegou em disco. |
+| `sem resposta do bot` | Aumente `--espera 60` ou confirme o passo 2.4. |
+| Resumo de congresso (suplemento) | Quase nunca tem PDF completo. Não insista. |
 
-- `baixar_por_doi.py` — script (sem credenciais; tudo por variavel de ambiente).
+## Ordem sugerida de tentativa
+
+1. Link do PDF na página da editora (acesso institucional).
+2. Botão [PDF] do Google Scholar.
+3. Este bot, pelo DOI.
+
+## Uso responsável
+
+Use apenas para artigos que você tem direito de acessar. Respeite os termos do Telegram (não
+dispare em massa: o script já espera entre os pedidos) e a legislação de direitos autorais do seu país.

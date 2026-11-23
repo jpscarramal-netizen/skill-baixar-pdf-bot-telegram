@@ -56,7 +56,7 @@ async def main():
         api_id = int(os.environ["TG_API_ID"]); api_hash = os.environ["TG_API_HASH"]
         sessao = os.environ["TG_SESSION"]
     except KeyError as e:
-        sys.exit(f"Falta a variavel de ambiente {e}. Veja o passo 1 da SKILL.md.")
+        sys.exit(f"Falta a variavel de ambiente {e}. Veja o passo 2 do README (criar a sua sessao).")
 
     os.makedirs(a.saida, exist_ok=True)
     tmp = tempfile.mkdtemp()
